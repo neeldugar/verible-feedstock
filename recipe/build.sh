@@ -1,36 +1,50 @@
 #!/bin/bash
 
-export CXXFLAGS="$CXXFLAGS -D_LIBCPP_DISABLE_AVAILABILITY"
+set -ex
 
-source gen-bazel-toolchain
-bazel build --crosstool_top=//bazel_toolchain:toolchain --cpu ${TARGET_CPU} -c opt --//bazel:use_local_flex_bison --linkopt=-lm //...
+# The binaries are already extracted in the source directory
+# We just need to copy them to the correct location
 
 mkdir -p $PREFIX/bin
-chmod a+w $PREFIX/bin
 
 # List of executables to install
-# pulled from https://github.com/chipsalliance/homebrew-verible/blob/main/Formula/verible.rb#L34-L44
 executables=(
-  "bazel-bin/verilog/tools/diff/verible-verilog-diff"
-  "bazel-bin/verilog/tools/formatter/verible-verilog-format"
-  "bazel-bin/verilog/tools/kythe/verible-verilog-kythe-extractor"
-  "bazel-bin/verilog/tools/lint/verible-verilog-lint"
-  "bazel-bin/verilog/tools/ls/verible-verilog-ls"
-  "bazel-bin/verilog/tools/obfuscator/verible-verilog-obfuscate"
-  "bazel-bin/verilog/tools/preprocessor/verible-verilog-preprocessor"
-  "bazel-bin/verilog/tools/project/verible-verilog-project"
-  "bazel-bin/verilog/tools/syntax/verible-verilog-syntax"
+  "verible-verilog-diff"
+  "verible-verilog-format"
+  "verible-verilog-kythe-extractor"
+  "verible-verilog-lint"
+  "verible-verilog-ls"
+  "verible-verilog-obfuscate"
+  "verible-verilog-preprocessor"
+  "verible-verilog-project"
+  "verible-verilog-syntax"
 )
 
 # Copy each executable to the $PREFIX/bin directory
 for exe in "${executables[@]}"; do
-  if [ -f "$SRC_DIR/$exe" ]; then
-    cp "$SRC_DIR/$exe" "$PREFIX/bin/"
-    chmod a+wx "$PREFIX/bin/$(basename $exe)"
-    if [[ "$target_platform" == linux-* ]]; then
-      patchelf --set-rpath "$PREFIX/lib" "$PREFIX/bin/$(basename $exe)"
-    fi
+  if [ -f "bin/$exe" ]; then
+    cp "bin/$exe" "$PREFIX/bin/"
+    chmod a+x "$PREFIX/bin/$exe"
   else
-    echo "Executable $exe not found, skipping."
+    echo "Warning: Executable $exe not found in bin/, skipping."
   fi
 done
+
+# Download LICENSE file from the Verible repository
+# The version should match the one in meta.yaml
+VERIBLE_VERSION="${PKG_VERSION//_/-}"
+LICENSE_URL="https://raw.githubusercontent.com/chipsalliance/verible/v${VERIBLE_VERSION}/LICENSE"
+
+echo "Downloading LICENSE file from: $LICENSE_URL"
+# We're already in $SRC_DIR, so just download it here
+curl -L -o LICENSE "$LICENSE_URL" || wget -O LICENSE "$LICENSE_URL"
+
+# Verify LICENSE was downloaded
+if [ ! -f LICENSE ]; then
+  echo "Error: Failed to download LICENSE file"
+  exit 1
+fi
+
+# Copy LICENSE file to the package documentation directory
+mkdir -p "$PREFIX/share/doc/$PKG_NAME"
+cp LICENSE "$PREFIX/share/doc/$PKG_NAME/"
