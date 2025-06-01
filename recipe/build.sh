@@ -1,9 +1,26 @@
 #!/bin/bash
 
+set -ex
+
 export CXXFLAGS="$CXXFLAGS -D_LIBCPP_DISABLE_AVAILABILITY"
 
+# macOS-specific fix for Bazel 7.x absolute path validation issue
+# Reference: https://github.com/bazelbuild/bazel/issues/21981
+if [[ "$target_platform" == osx-* ]]; then
+  export CFLAGS="$CFLAGS -fno-canonical-system-headers -no-canonical-prefixes"
+  export CXXFLAGS="$CXXFLAGS -fno-canonical-system-headers -no-canonical-prefixes"
+fi
+
 source gen-bazel-toolchain
-bazel build --crosstool_top=//bazel_toolchain:toolchain --cpu ${TARGET_CPU} -c opt --//bazel:use_local_flex_bison --linkopt=-lm //...
+
+# Additional Bazel flags to handle macOS absolute path validation issues
+if [[ "$target_platform" == osx-* ]]; then
+  BAZEL_EXTRA_FLAGS="--incompatible_sandbox_hermetic_tmp=false"
+else
+  BAZEL_EXTRA_FLAGS=""
+fi
+
+bazel build --crosstool_top=//bazel_toolchain:toolchain --cpu ${TARGET_CPU} -c opt --//bazel:use_local_flex_bison --linkopt=-lm $BAZEL_EXTRA_FLAGS //...
 
 mkdir -p $PREFIX/bin
 chmod a+w $PREFIX/bin
@@ -34,3 +51,5 @@ for exe in "${executables[@]}"; do
     echo "Executable $exe not found, skipping."
   fi
 done
+
+echo "Verible installation completed successfully!"
