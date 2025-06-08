@@ -11,7 +11,6 @@ Summary: The Verible project's main mission is to parse SystemVerilog (IEEE 1800
 (as standardized in the SV-LRM) for a wide variety of applications, including
 developer tools.
 
-
 Current build status
 ====================
 
